@@ -560,12 +560,13 @@ def detection_threshold_sweep(model, base_odor, concentrations,
               f"  spont_proj={pre_proj.mean():.3f}  p={p_val:.4f}")
 
         # require two consecutive significant concentrations to declare threshold
-        if p_val < 0.05:
-            consec += 1
-            if consec >= 2 and threshold is None:
-                threshold = concentrations[p_values.index(p_val) - 1]
-        else:
-            consec = 0
+        for ci, conc in enumerate(concentrations):
+            if p_val < 0.05:
+                consec += 1
+                if consec >= 2 and threshold is None:
+                    threshold = concentrations[ci - 1]  # first of the two consecutive
+            else:
+                consec = 0
 
     return p_values, threshold
 
@@ -1103,7 +1104,7 @@ def run_aging_complexity(complexity_odors, complexity_names, complexity_labels,
 ####################################### MAIN #####################################################
 
 if __name__ == '__main__':
-    np.random.seed(17)
+    np.random.seed(10)
 
     N_GLOM     = 100
     N_ODOR     = 100
@@ -1119,7 +1120,7 @@ if __name__ == '__main__':
     RUN_ISOLATION_SWEEP = False
     RUN_AGING_COMPLEXITY = False
     RUN_DETECTION_THRESHOLD = False
-    RUN_DETECTION_THRESHOLD_ONEBYONE = False
+    RUN_DETECTION_THRESHOLD_ONEBYONE = True
 
     print('Building network...')
     model = Network(n_glomeruli=N_GLOM, n_OSNs_per_glom=N_OSN,
@@ -1259,7 +1260,8 @@ if __name__ == '__main__':
     if RUN_DETECTION_THRESHOLD:
         CONCENTRATIONS = [0.001, 0.003, 0.005, 0.008, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0]
         base_odor = np.zeros(N_ODOR)
-        base_odor[20] = 1.0
+        base_odor[35] = 1.0
+
     
         thresh_results = {}
         for age_group in ['young', 'old']:
@@ -1330,3 +1332,21 @@ if __name__ == '__main__':
                 model, base_odor, CONCENTRATIONS, n_trials=15, T=1.5)
             thresh_results[label] = {'p_values': pvals, 'threshold': thresh}
             print(f"  Threshold: {thresh}")
+            # plot threshold comparison across conditions
+            fig, ax = plt.subplots(figsize=(10, 5))
+            colors = plt.cm.viridis(np.linspace(0.1, 0.9, len(CONCENTRATIONS)))
+            for label, res in thresh_results.items():
+                ax.plot(CONCENTRATIONS, res['p_values'], 'o-', lw=1.5, label=label)
+            ax.axhline(0.05, color='gray', ls='--', lw=1.2, label='p=0.05')
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.set_xlabel('Odor concentration')
+            ax.set_ylabel('p-value')
+            ax.set_title('Detection threshold — one parameter at a time')
+            ax.legend(fontsize=7, loc='upper right')
+            ax.grid(alpha=0.25)
+            plt.tight_layout()
+            fname = f'{savepath}/detection_threshold_onebyone.png'
+            plt.savefig(fname, dpi=150, bbox_inches='tight')
+            plt.show()
+            print(f'Saved: {fname}')
